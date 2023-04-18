@@ -40,6 +40,34 @@ status:
   creationTimestamp: null`
 )
 
+// patchEmtpyTypesToObjectType walks the given schema to find those properties that has no type set and makes them to be an Object.
+// That's a specific patch that lets the generated CRDs be valid to install in k8s servers when they use generic types like `google.protobuf.Value`.
+// https://github.com/istio/api/blob/1.15.5/operator/v1alpha1/operator.proto#L323
+// This is resolved to Top type for cue (meaning it allows anything), and OpenAPI spec does is not that generic to allow this kind of `any` specification
+// for the schema.
+func patchEmtpyTypesToObjectType(j *apiextv1.JSONSchemaProps) {
+	if j.Type == "" {
+		j.Type = "object"
+		j.XPreserveUnknownFields = pointer.Bool(true)
+	}
+
+	// walk properties
+	ps := make(map[string]apiextv1.JSONSchemaProps)
+	for s, p := range j.Properties {
+		patchEmtpyTypesToObjectType(&p)
+		ps[s] = p
+	}
+	j.Properties = ps
+
+	// walk items
+	if j.Items != nil {
+		patchEmtpyTypesToObjectType(j.Items.Schema)
+		for _, i := range j.Items.JSONSchemas {
+			patchEmtpyTypesToObjectType(&i)
+		}
+	}
+}
+
 // Build CRDs based on the configuration and schema.
 //
 //nolint:staticcheck,interfacer,lll
@@ -63,6 +91,8 @@ func completeCRD(c *apiextv1.CustomResourceDefinition, versionSchemas map[string
 				crdutil.EditSchema(j, p)
 			}
 		}
+
+		patchEmtpyTypesToObjectType(j)
 
 		version.Schema = &apiextv1.CustomResourceValidation{OpenAPIV3Schema: &apiextv1.JSONSchemaProps{
 			Type: "object",
