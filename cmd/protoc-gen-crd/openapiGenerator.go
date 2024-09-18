@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -366,6 +367,12 @@ func (g *openapiGenerator) generateFile(
 						column.Description = m
 					case "JSONPath":
 						column.JSONPath = m
+					case "priority":
+						p, err := strconv.Atoi(m)
+						if err != nil {
+							log.Fatalf("invalid priority %v: %v", m, err)
+						}
+						column.Priority = int32(p)
 					}
 				}
 				ver.AdditionalPrinterColumns = append(ver.AdditionalPrinterColumns, column)
