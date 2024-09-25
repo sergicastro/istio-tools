@@ -1,4 +1,4 @@
-module github.com/sergicastro/istio-tools
+module github.com/istio/tools
 
 go 1.21
 
